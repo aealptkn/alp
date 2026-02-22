@@ -13,60 +13,60 @@
     <script src="./model/jspdf.umd.min.js"></script>
 
     <style>
-        /* iOS Koyu Tema ve Ekran Taşırma Koruması */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #000000; color: #ffffff; margin: 0; padding: 15px; overflow-x: hidden; box-sizing: border-box; }
+        /* iOS Koyu Tema - Daha Kompakt ve Ekran Taşırma Koruması */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #000000; color: #ffffff; margin: 0; padding: 12px; overflow-x: hidden; box-sizing: border-box; }
         .container { max-width: 500px; margin: 0 auto; width: 100%; box-sizing: border-box; }
         
-        /* Ana Butonlar */
+        /* Ana Butonlar - iPhone için Küçültüldü */
         .capture-btn {
-            background: #ffd60a; color: #000000; border: none; padding: 16px; width: 100%;
-            font-size: 18px; font-weight: 700; border-radius: 12px; display: block; text-align: center;
-            box-sizing: border-box; cursor: pointer; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            background: #ffd60a; color: #000000; border: none; padding: 12px; width: 100%;
+            font-size: 16px; font-weight: 700; border-radius: 10px; display: block; text-align: center;
+            box-sizing: border-box; cursor: pointer; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .manual-btn { background: #ff453a; color: white; display: none; margin-top: 10px; }
         .confirm-btn { background: #32d74b; color: white; display: none; margin-top: 10px; }
         input[type="file"] { display: none; }
         
         /* Görüntü Alanları */
-        .image-container { position: relative; width: 100%; display: flex; justify-content: center; border-radius: 12px; overflow: hidden; }
-        #preview { display: none; width: 100%; border-radius: 12px; user-select: none; -webkit-user-drag: none; }
-        #selectionCanvas { position: absolute; top: 0; left: 0; display: none; touch-action: none; border-radius: 12px; cursor: crosshair; }
-        #processedPreview { width: 100%; border-radius: 12px; margin-top: 15px; border: 2px solid #333; display: none; }
-        #status { margin-top: 15px; padding: 15px; background: #1c1c1e; border-radius: 12px; font-size: 15px; word-wrap: break-word; min-height: 40px; text-align: center; color: #e5e5ea; }
+        .image-container { position: relative; width: 100%; display: flex; justify-content: center; border-radius: 10px; overflow: hidden; }
+        #preview { display: none; width: 100%; max-height: 400px; object-fit: contain; border-radius: 10px; user-select: none; -webkit-user-drag: none; }
+        #selectionCanvas { position: absolute; top: 0; left: 0; display: none; touch-action: none; border-radius: 10px; cursor: crosshair; }
+        #processedPreview { width: 100%; border-radius: 10px; margin-top: 12px; border: 2px solid #333; display: none; }
+        #status { margin-top: 12px; padding: 12px; background: #1c1c1e; border-radius: 10px; font-size: 14px; word-wrap: break-word; min-height: 40px; text-align: center; color: #e5e5ea; }
         
-        /* iPhone Stili Kayıt Kartları */
-        .records-header { margin-top: 30px; border-bottom: 1px solid #38383a; padding-bottom: 10px; font-size: 20px; font-weight: 600; }
-        .record-item { background: #1c1c1e; padding: 15px; margin-top: 15px; border-radius: 16px; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
-        .record-image { width: 100%; border-radius: 10px; object-fit: cover; max-height: 250px; background: #000; }
+        /* iPhone Stili Kayıt Kartları - Daha Zarif Boyutlar */
+        .records-header { margin-top: 25px; border-bottom: 1px solid #38383a; padding-bottom: 8px; font-size: 18px; font-weight: 600; }
+        .record-item { background: #1c1c1e; padding: 12px; margin-top: 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; }
+        .record-image { width: 100%; border-radius: 8px; object-fit: cover; max-height: 200px; background: #000; }
         
-        /* Seçilebilir Metinler (Kopyalama Kolaylığı) */
-        .copyable-text { user-select: all; -webkit-user-select: all; margin: 2px 0; font-size: 14px; color: #aeaeb2; word-break: break-all; }
-        .record-item h3 { margin: 0; font-size: 22px; letter-spacing: 1px; color: #ffffff; user-select: all; -webkit-user-select: all; }
+        /* Seçilebilir Metinler */
+        .copyable-text { user-select: all; -webkit-user-select: all; margin: 2px 0; font-size: 13px; color: #aeaeb2; word-break: break-word; }
+        .record-item h3 { margin: 0; font-size: 18px; letter-spacing: 1px; color: #ffffff; user-select: all; -webkit-user-select: all; }
         
-        /* iOS Metin Kutusu (Not/Marka İçin) */
-        .note-input { background: #2c2c2e; border: none; color: white; padding: 12px; border-radius: 10px; font-size: 15px; width: 100%; box-sizing: border-box; outline: none; transition: 0.2s; }
+        /* iOS Metin Kutusu */
+        .note-input { background: #2c2c2e; border: none; color: white; padding: 10px; border-radius: 8px; font-size: 14px; width: 100%; box-sizing: border-box; outline: none; transition: 0.2s; }
         .note-input:focus { outline: 2px solid #0a84ff; }
         
         /* Aksiyon Butonları */
-        .record-actions { display: flex; gap: 10px; margin-top: 5px; }
-        .action-btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-weight: 600; font-size: 15px; cursor: pointer; color: white; transition: 0.2s; }
+        .record-actions { display: flex; gap: 8px; margin-top: 4px; }
+        .action-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; color: white; transition: 0.2s; }
         .copy-btn { background: #0a84ff; }
         .copy-btn:active { background: #007aff; }
         .delete-btn { background: #ff453a; }
         .delete-btn:active { background: #d70015; }
         
         /* Tümünü Temizle Butonu */
-        .clear-all-btn { background: transparent; color: #ff453a; border: 2px solid #ff453a; padding: 14px; border-radius: 12px; width: 100%; font-size: 16px; font-weight: bold; margin-top: 25px; margin-bottom: 30px; cursor: pointer; display: none; box-sizing: border-box; }
+        .clear-all-btn { background: transparent; color: #ff453a; border: 2px solid #ff453a; padding: 12px; border-radius: 10px; width: 100%; font-size: 15px; font-weight: bold; margin-top: 20px; margin-bottom: 25px; cursor: pointer; display: none; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2 style="text-align: center; margin-top: 5px;">📷 Alptekin ALPR</h2>
+        <h2 style="text-align: center; margin-top: 0px; font-size: 20px;">📷 Alptekin ALPR</h2>
         
         <label class="capture-btn">
             Fotoğraf Çek / Yükle
-            <input type="file" accept="image/*" capture="environment" id="cameraInput">
+            <input type="file" accept="image/*" id="cameraInput">
         </label>
 
         <div class="image-container">
@@ -83,8 +83,7 @@
         <h3 class="records-header">Kayıtlı Araçlar</h3>
         <div id="recordsList"></div>
         <button id="clearAllBtn" class="clear-all-btn" onclick="clearAllRecords()">Tüm Kayıtları Temizle</button>
-        <button id="downloadPdfBtn" class="capture-btn" style="background: #ff9500; margin-top: 25px; margin-bottom: -15px;" onclick="downloadPDF()">📄 Listeyi PDF Olarak İndir</button>
-
+        <button id="downloadPdfBtn" class="capture-btn" style="background: #ff9500; margin-top: 20px; margin-bottom: -10px;" onclick="downloadPDF()">📄 Listeyi PDF Olarak İndir</button>
     </div>
 
     <script>
@@ -107,27 +106,23 @@
         let currentDateText = "";
         let lastCrop = { x: 0, y: 0, w: 0, h: 0 };
 
-        // SİSTEM BAŞLANGICI VE ÇEVRİMDIŞI İNDİRME DİNLEYİCİSİ
         window.onload = async () => {
             loadRecords();
             
-            // 1. Service Worker (Arka plan indirme) Kontrolü
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('./sw.js').then(registration => {
                     registration.addEventListener('updatefound', () => {
                         const installingWorker = registration.installing;
                         installingWorker.addEventListener('statechange', () => {
                             if (installingWorker.state === 'installed') {
-                                // İndirme %100 bittiğinde çalışacak şık uyarı
                                 const currentText = statusDiv.innerHTML;
                                 statusDiv.innerHTML = "✅ <b>İndirme Tamamlandı!</b><br><small>Sistem artık tamamen internetsiz (offline) çalışabilir.</small>";
-                                statusDiv.style.background = "#32d74b"; // iOS başarı yeşili
+                                statusDiv.style.background = "#32d74b"; 
                                 statusDiv.style.color = "#ffffff";
                                 
-                                // 4 saniye sonra kutuyu eski haline döndür
                                 setTimeout(() => {
                                     statusDiv.innerHTML = currentText.includes('Sistem') ? "<b>YOLOv8 Aktif!</b> Fotoğraf çekebilirsiniz." : currentText;
-                                    statusDiv.style.background = "#1c1c1e"; // Orijinal iOS koyu grisi
+                                    statusDiv.style.background = "#1c1c1e"; 
                                     statusDiv.style.color = "#e5e5ea";
                                 }, 4000);
                             }
@@ -136,7 +131,6 @@
                 });
             }
 
-            // 2. Yapay Zeka Modelinin Yüklenmesi
             try {
                 yoloModel = await tf.loadGraphModel('./model/model.json');
                 statusDiv.innerHTML = "<b>YOLOv8 Aktif!</b> Fotoğraf çekebilirsiniz.";
@@ -146,31 +140,41 @@
             }
         };
 
-        cameraInput.addEventListener('change', async (e) => {
+        // YENİ: iOS Kamera Kilitlenmesini Çözen İmaj Yükleme Mimarisi
+        cameraInput.addEventListener('change', (e) => {
             if (e.target.files.length === 0) return;
             resetUI(); 
             processedPreview.style.display = 'none'; 
             manualSelectBtn.innerText = "El ile Plaka Seç"; 
+            statusDiv.innerHTML = "Fotoğraf işleniyor... <br><small>Lütfen bekleyin</small>";
             
             const file = e.target.files[0];
-            preview.src = URL.createObjectURL(file);
-            preview.style.display = 'block';
-            
-            navigator.geolocation.getCurrentPosition(
-                (pos) => currentLocationText = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`,
-                () => currentLocationText = "Konum alınamadı",
-                { timeout: 5000 }
-            );
-            currentDateText = new Date().toLocaleString('tr-TR');
+            const reader = new FileReader(); // iOS Safari belleği için daha güvenli
 
-            await new Promise(r => preview.onload = r);
+            reader.onload = (event) => {
+                preview.onload = () => {
+                    preview.style.display = 'block';
+                    
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => currentLocationText = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`,
+                        () => currentLocationText = "Konum alınamadı",
+                        { timeout: 5000 }
+                    );
+                    currentDateText = new Date().toLocaleString('tr-TR');
 
-            if (yoloModel) {
-                await runYOLO(preview);
-            } else {
-                manualSelectBtn.style.display = 'block';
-                statusDiv.innerText = "Lütfen butona basıp plakayı seçin.";
-            }
+                    // YENİ: Safari'nin arayüzü çizmesi ve kilitlenmemesi için 300ms nefes alma süresi
+                    setTimeout(async () => {
+                        if (yoloModel) {
+                            await runYOLO(preview);
+                        } else {
+                            manualSelectBtn.style.display = 'block';
+                            statusDiv.innerText = "Lütfen butona basıp plakayı seçin.";
+                        }
+                    }, 300);
+                };
+                preview.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
         });
 
         async function runYOLO(imgElement) {
@@ -213,7 +217,6 @@
             }
         }
 
-        // Manuel Çizim Mantığı
         manualSelectBtn.addEventListener('click', () => {
             selectionCanvas.style.display = 'block';
             selectionCanvas.width = preview.clientWidth; selectionCanvas.height = preview.clientHeight;
@@ -316,11 +319,10 @@
             return result;
         }
 
-        // FOTOĞRAFI HAFIZAYA ALMAK İÇİN SIKIŞTIRMA İŞLEMİ (Yeni)
         function getCompressedImage() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            const MAX_WIDTH = 500; // Hafızayı doldurmamak için küçültüyoruz
+            const MAX_WIDTH = 500; 
             let width = preview.naturalWidth;
             let height = preview.naturalHeight;
 
@@ -331,7 +333,7 @@
             canvas.width = width;
             canvas.height = height;
             ctx.drawImage(preview, 0, 0, width, height);
-            return canvas.toDataURL('image/jpeg', 0.6); // %60 Kalite JPEG (Hafif)
+            return canvas.toDataURL('image/jpeg', 0.6); 
         }
 
         async function performOCR(canvas, attempt) {
@@ -361,7 +363,6 @@
                 if (!plate || plate.length < 4) plate = "OKUNAMADI";
                 statusDiv.innerText = "İşlem Tamamlandı! Bulunan: " + plate;
                 
-                // YENİ: Fotoğrafı ve Boş Not Alanını da Kaydet
                 const compressedImg = getCompressedImage();
                 saveRecord({ plate: plate, date: currentDateText, location: currentLocationText, image: compressedImg, note: "" });
                 
@@ -381,11 +382,9 @@
             isDrawing = false;
         }
 
-        // YENİ KAYIT YÖNETİMİ FONKSİYONLARI
         function saveRecord(r) {
             let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
             rs.unshift(r); 
-            // Telefon hafızası çökmesin diye en fazla son 30 aracı tutar
             if(rs.length > 30) rs.pop();
             localStorage.setItem('plate_records', JSON.stringify(rs));
             loadRecords();
@@ -415,7 +414,6 @@
             }
         }
 
-        // YENİ: PDF OLUŞTURMA VE İNDİRME MOTORU
         function downloadPDF() {
             let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
             if (rs.length === 0) {
@@ -423,15 +421,11 @@
                 return;
             }
 
-            // jsPDF Kütüphanesini Başlat
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-
-            // Standart jsPDF fontu Türkçe karakterleri (ş,ğ,ı) desteklemediği için harfleri dönüştüren ufak bir filtre (Crash olmasını önler)
             const trMap = { 'ç':'c', 'ğ':'g', 'ı':'i', 'ö':'o', 'ş':'s', 'ü':'u', 'Ç':'C', 'Ğ':'G', 'İ':'I', 'Ö':'O', 'Ş':'S', 'Ü':'U' };
             const tr = (text) => text ? text.replace(/[çğıöşüÇĞİÖŞÜ]/g, m => trMap[m]) : "";
 
-            // Başlık
             doc.setFontSize(18);
             doc.text("Arac Kayit Raporu", 20, 20);
             doc.setFontSize(10);
@@ -439,23 +433,18 @@
             doc.text("Olusturulma: " + new Date().toLocaleString('tr-TR'), 20, 28);
             doc.setTextColor(0);
 
-            let yPos = 40; // Sayfa başı dikey boşluk
+            let yPos = 40; 
 
             rs.forEach((r, index) => {
-                // Eğer sayfanın sonuna geldiysek yeni sayfa aç
                 if (yPos > 260) {
                     doc.addPage();
                     yPos = 20;
                 }
 
-                // 1. Araç Fotoğrafını Ekle (Genişlik: 40, Yükseklik: 30)
                 if (r.image) {
-                    try {
-                        doc.addImage(r.image, 'JPEG', 20, yPos, 40, 30);
-                    } catch(e) { console.log("Resim PDF'e eklenemedi."); }
+                    try { doc.addImage(r.image, 'JPEG', 20, yPos, 40, 30); } catch(e) {}
                 }
 
-                // 2. Metin Bilgilerini Ekle
                 doc.setFontSize(14);
                 doc.setFont(undefined, 'bold');
                 doc.text(`Plaka: ${tr(r.plate)}`, 65, yPos + 6);
@@ -466,14 +455,10 @@
                 doc.text(`Tarih: ${tr(r.date)}`, 65, yPos + 21);
                 doc.text(`Konum: ${tr(r.location)}`, 65, yPos + 28);
 
-                yPos += 40; // Bir sonraki araç için imleci aşağı kaydır
-                
-                // Araçlar arasına ayırıcı çizgi çek
+                yPos += 40; 
                 doc.setDrawColor(200);
                 doc.line(20, yPos - 5, 190, yPos - 5);
             });
-
-            // PDF'i Cihaza İndir
             doc.save("ALPR_Rapor.pdf");
         }
 
@@ -490,30 +475,28 @@
             }
         }
 
-        // YENİ: KONUMU ZORLA GÜNCELLEME FONKSİYONU
         function retryLocation(index) {
             let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
             if(rs[index]) {
-                // Kullanıcıya aradığımızı göster
                 rs[index].location = "Konum aranıyor... ⏳";
                 localStorage.setItem('plate_records', JSON.stringify(rs));
-                loadRecords(); // Ekranı hemen yenile ki kum saati görünsün
+                loadRecords(); 
 
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
                         let rs2 = JSON.parse(localStorage.getItem('plate_records') || "[]");
                         rs2[index].location = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
                         localStorage.setItem('plate_records', JSON.stringify(rs2));
-                        loadRecords(); // Başarıyla buldu, ekrana yaz
+                        loadRecords(); 
                     },
                     (err) => {
                         alert("Hata: Konum erişim izni yok veya GPS uydusu bulunamıyor.");
                         let rs2 = JSON.parse(localStorage.getItem('plate_records') || "[]");
                         rs2[index].location = "Konum alınamadı";
                         localStorage.setItem('plate_records', JSON.stringify(rs2));
-                        loadRecords(); // Bulamadı, eski haline döndür
+                        loadRecords(); 
                     },
-                    { enableHighAccuracy: true, timeout: 5000 } // Yüksek doğrulukla uyduları zorla
+                    { enableHighAccuracy: true, timeout: 5000 }
                 );
             }
         }
