@@ -13,8 +13,9 @@ const OFFLINE_URLS = [
     './model/group1-shard1of3.bin',
     './model/group1-shard2of3.bin',
     './model/group1-shard3of3.bin',
-    './model/jspdf.umd.min.js' // YENİ: PDF motorunu çevrimdışı listeye ekledik
-    
+    './model/jspdf.umd.min.js', // YENİ: PDF motorunu çevrimdışı listeye ekledik
+    './logo192.png',
+    './logo512.png'
 ];
 
 self.addEventListener('install', (event) => {
