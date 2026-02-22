@@ -1,14 +1,19 @@
 {
-  "name": "Plaka Okuyucu PWA",
-  "short_name": "PlakaOku",
+  "name": "Alptekin ALPR",
+  "short_name": "Alptekin",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#ffeb3b",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/2823/2823611.png",
+      "src": "./logo192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./logo512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
