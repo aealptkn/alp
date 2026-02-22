@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Alptekin ALPR</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <script src="./model/tesseract.min.js"></script>
+    <script src="./model/tf.min.js"></script>
+    <script src="./model/jspdf.umd.min.js"></script>
+
+    <style>
+        /* iOS Koyu Tema ve Ekran Taşırma Koruması */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #000000; color: #ffffff; margin: 0; padding: 15px; overflow-x: hidden; box-sizing: border-box; }
+        .container { max-width: 500px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+        
+        /* Ana Butonlar */
+        .capture-btn {
+            background: #ffd60a; color: #000000; border: none; padding: 16px; width: 100%;
+            font-size: 18px; font-weight: 700; border-radius: 12px; display: block; text-align: center;
+            box-sizing: border-box; cursor: pointer; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .manual-btn { background: #ff453a; color: white; display: none; margin-top: 10px; }
+        .confirm-btn { background: #32d74b; color: white; display: none; margin-top: 10px; }
+        input[type="file"] { display: none; }
+        
+        /* Görüntü Alanları */
+        .image-container { position: relative; width: 100%; display: flex; justify-content: center; border-radius: 12px; overflow: hidden; }
+        #preview { display: none; width: 100%; border-radius: 12px; user-select: none; -webkit-user-drag: none; }
+        #selectionCanvas { position: absolute; top: 0; left: 0; display: none; touch-action: none; border-radius: 12px; cursor: crosshair; }
+        #processedPreview { width: 100%; border-radius: 12px; margin-top: 15px; border: 2px solid #333; display: none; }
+        #status { margin-top: 15px; padding: 15px; background: #1c1c1e; border-radius: 12px; font-size: 15px; word-wrap: break-word; min-height: 40px; text-align: center; color: #e5e5ea; }
+        
+        /* iPhone Stili Kayıt Kartları */
+        .records-header { margin-top: 30px; border-bottom: 1px solid #38383a; padding-bottom: 10px; font-size: 20px; font-weight: 600; }
+        .record-item { background: #1c1c1e; padding: 15px; margin-top: 15px; border-radius: 16px; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
+        .record-image { width: 100%; border-radius: 10px; object-fit: cover; max-height: 250px; background: #000; }
+        
+        /* Seçilebilir Metinler (Kopyalama Kolaylığı) */
+        .copyable-text { user-select: all; -webkit-user-select: all; margin: 2px 0; font-size: 14px; color: #aeaeb2; word-break: break-all; }
+        .record-item h3 { margin: 0; font-size: 22px; letter-spacing: 1px; color: #ffffff; user-select: all; -webkit-user-select: all; }
+        
+        /* iOS Metin Kutusu (Not/Marka İçin) */
+        .note-input { background: #2c2c2e; border: none; color: white; padding: 12px; border-radius: 10px; font-size: 15px; width: 100%; box-sizing: border-box; outline: none; transition: 0.2s; }
+        .note-input:focus { outline: 2px solid #0a84ff; }
+        
+        /* Aksiyon Butonları */
+        .record-actions { display: flex; gap: 10px; margin-top: 5px; }
+        .action-btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-weight: 600; font-size: 15px; cursor: pointer; color: white; transition: 0.2s; }
+        .copy-btn { background: #0a84ff; }
+        .copy-btn:active { background: #007aff; }
+        .delete-btn { background: #ff453a; }
+        .delete-btn:active { background: #d70015; }
+        
+        /* Tümünü Temizle Butonu */
+        .clear-all-btn { background: transparent; color: #ff453a; border: 2px solid #ff453a; padding: 14px; border-radius: 12px; width: 100%; font-size: 16px; font-weight: bold; margin-top: 25px; margin-bottom: 30px; cursor: pointer; display: none; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2 style="text-align: center; margin-top: 5px;">📷 Alptekin ALPR</h2>
+        
+        <label class="capture-btn">
+            Fotoğraf Çek / Yükle
+            <input type="file" accept="image/*" capture="environment" id="cameraInput">
+        </label>
+
+        <div class="image-container">
+            <img id="preview" alt="Orijinal">
+            <canvas id="selectionCanvas"></canvas>
+        </div>
+        
+        <button id="manualSelectBtn" class="capture-btn manual-btn">El ile Plaka Seç</button>
+        <button id="confirmSelectionBtn" class="capture-btn confirm-btn">Seçimi Onayla ve Oku</button>
+
+        <canvas id="processedPreview"></canvas>
+        <div id="status">Sistem başlatılıyor...</div>
+
+        <h3 class="records-header">Kayıtlı Araçlar</h3>
+        <div id="recordsList"></div>
+        <button id="clearAllBtn" class="clear-all-btn" onclick="clearAllRecords()">Tüm Kayıtları Temizle</button>
+        <button id="downloadPdfBtn" class="capture-btn" style="background: #ff9500; margin-top: 25px; margin-bottom: -15px;" onclick="downloadPDF()">📄 Listeyi PDF Olarak İndir</button>
+
+    </div>
+
+    <script>
+        const cameraInput = document.getElementById('cameraInput');
+        const preview = document.getElementById('preview');
+        const processedPreview = document.getElementById('processedPreview');
+        const statusDiv = document.getElementById('status');
+        const recordsList = document.getElementById('recordsList');
+        const manualSelectBtn = document.getElementById('manualSelectBtn');
+        const confirmSelectionBtn = document.getElementById('confirmSelectionBtn');
+        const selectionCanvas = document.getElementById('selectionCanvas');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const sCtx = selectionCanvas.getContext('2d');
+        
+        let yoloModel = null;
+        let isDrawing = false;
+        let startX, startY, endX, endY;
+        let scaleX = 1, scaleY = 1;
+        let currentLocationText = "Konum alınamadı";
+        let currentDateText = "";
+        let lastCrop = { x: 0, y: 0, w: 0, h: 0 };
+
+        // SİSTEM BAŞLANGICI VE ÇEVRİMDIŞI İNDİRME DİNLEYİCİSİ
+        window.onload = async () => {
+            loadRecords();
+            
+            // 1. Service Worker (Arka plan indirme) Kontrolü
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').then(registration => {
+                    registration.addEventListener('updatefound', () => {
+                        const installingWorker = registration.installing;
+                        installingWorker.addEventListener('statechange', () => {
+                            if (installingWorker.state === 'installed') {
+                                // İndirme %100 bittiğinde çalışacak şık uyarı
+                                const currentText = statusDiv.innerHTML;
+                                statusDiv.innerHTML = "✅ <b>İndirme Tamamlandı!</b><br><small>Sistem artık tamamen internetsiz (offline) çalışabilir.</small>";
+                                statusDiv.style.background = "#32d74b"; // iOS başarı yeşili
+                                statusDiv.style.color = "#ffffff";
+                                
+                                // 4 saniye sonra kutuyu eski haline döndür
+                                setTimeout(() => {
+                                    statusDiv.innerHTML = currentText.includes('Sistem') ? "<b>YOLOv8 Aktif!</b> Fotoğraf çekebilirsiniz." : currentText;
+                                    statusDiv.style.background = "#1c1c1e"; // Orijinal iOS koyu grisi
+                                    statusDiv.style.color = "#e5e5ea";
+                                }, 4000);
+                            }
+                        });
+                    });
+                });
+            }
+
+            // 2. Yapay Zeka Modelinin Yüklenmesi
+            try {
+                yoloModel = await tf.loadGraphModel('./model/model.json');
+                statusDiv.innerHTML = "<b>YOLOv8 Aktif!</b> Fotoğraf çekebilirsiniz.";
+            } catch (e) {
+                statusDiv.innerHTML = "Model dosyaları bulunamadı. <br>Lütfen <b>Manuel Seçim</b> kullanın.";
+                manualSelectBtn.style.display = 'block';
+            }
+        };
+
+        cameraInput.addEventListener('change', async (e) => {
+            if (e.target.files.length === 0) return;
+            resetUI(); 
+            processedPreview.style.display = 'none'; 
+            manualSelectBtn.innerText = "El ile Plaka Seç"; 
+            
+            const file = e.target.files[0];
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            
+            navigator.geolocation.getCurrentPosition(
+                (pos) => currentLocationText = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`,
+                () => currentLocationText = "Konum alınamadı",
+                { timeout: 5000 }
+            );
+            currentDateText = new Date().toLocaleString('tr-TR');
+
+            await new Promise(r => preview.onload = r);
+
+            if (yoloModel) {
+                await runYOLO(preview);
+            } else {
+                manualSelectBtn.style.display = 'block';
+                statusDiv.innerText = "Lütfen butona basıp plakayı seçin.";
+            }
+        });
+
+        async function runYOLO(imgElement) {
+            try {
+                statusDiv.innerHTML = "YOLO analiz ediyor... <br><small>Yapay Zeka Devrede</small>";
+                const tensor = tf.browser.fromPixels(imgElement).resizeBilinear([640, 640]).expandDims(0).toFloat().div(tf.scalar(255.0));
+                const predictions = await yoloModel.executeAsync(tensor);
+                
+                const data = predictions.dataSync();
+                const numAnchors = predictions.shape[2];
+                let maxScore = 0; let maxIdx = -1;
+                const scoreOffset = 4 * numAnchors; 
+                
+                for (let i = 0; i < numAnchors; i++) {
+                    if (data[scoreOffset + i] > maxScore) { maxScore = data[scoreOffset + i]; maxIdx = i; }
+                }
+
+                tf.dispose([tensor, predictions]);
+
+                if (maxScore > 0.40) {
+                    statusDiv.innerHTML = `Plaka %${Math.round(maxScore * 100)} bulundu! Kesiliyor...`;
+                    let cx = data[0 * numAnchors + maxIdx]; let cy = data[1 * numAnchors + maxIdx];
+                    let w = data[2 * numAnchors + maxIdx]; let h = data[3 * numAnchors + maxIdx];
+                    let sX = imgElement.naturalWidth / 640; let sY = imgElement.naturalHeight / 640;
+
+                    lastCrop.x = Math.max(0, Math.round((cx - w / 2) * sX));
+                    lastCrop.y = Math.max(0, Math.round((cy - h / 2) * sY));
+                    lastCrop.w = Math.min(imgElement.naturalWidth - lastCrop.x, Math.round(w * sX));
+                    lastCrop.h = Math.min(imgElement.naturalHeight - lastCrop.y, Math.round(h * sY));
+
+                    const standardCanvas = enhancePlate(imgElement, lastCrop.x, lastCrop.y, lastCrop.w, lastCrop.h, 'standard');
+                    performOCR(standardCanvas, 1);
+                } else {
+                    statusDiv.innerHTML = "Yapay Zeka plakadan emin olamadı. Lütfen elle seçin.";
+                    manualSelectBtn.style.display = 'block';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = "Otomatik tespit yapılamadı. Lütfen elle seçin.";
+                manualSelectBtn.style.display = 'block';
+            }
+        }
+
+        // Manuel Çizim Mantığı
+        manualSelectBtn.addEventListener('click', () => {
+            selectionCanvas.style.display = 'block';
+            selectionCanvas.width = preview.clientWidth; selectionCanvas.height = preview.clientHeight;
+            scaleX = preview.naturalWidth / preview.clientWidth; scaleY = preview.naturalHeight / preview.clientHeight;
+            statusDiv.innerText = "Parmağınızla plaka etrafını çizin.";
+            manualSelectBtn.style.display = 'none';
+        });
+
+        const getPos = (e) => {
+            const rect = selectionCanvas.getBoundingClientRect();
+            const cx = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+            const cy = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+            return { x: cx - rect.left, y: cy - rect.top };
+        };
+
+        const startAction = (e) => { e.preventDefault(); const pos = getPos(e); startX = pos.x; startY = pos.y; isDrawing = true; confirmSelectionBtn.style.display = 'none'; };
+        const moveAction = (e) => {
+            if (!isDrawing) return; e.preventDefault(); const pos = getPos(e); endX = pos.x; endY = pos.y;
+            sCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+            sCtx.strokeStyle = '#32d74b'; sCtx.lineWidth = 3; sCtx.strokeRect(startX, startY, endX - startX, endY - startY);
+        };
+        const endAction = () => { if (!isDrawing) return; isDrawing = false; if (Math.abs(endX - startX) > 15) confirmSelectionBtn.style.display = 'block'; };
+
+        selectionCanvas.addEventListener('mousedown', startAction); selectionCanvas.addEventListener('mousemove', moveAction); window.addEventListener('mouseup', endAction);
+        selectionCanvas.addEventListener('touchstart', startAction, {passive: false}); selectionCanvas.addEventListener('touchmove', moveAction, {passive: false}); selectionCanvas.addEventListener('touchend', endAction);
+
+        confirmSelectionBtn.addEventListener('click', () => {
+            lastCrop.x = Math.max(0, Math.round(Math.min(startX, endX) * scaleX));
+            lastCrop.y = Math.max(0, Math.round(Math.min(startY, endY) * scaleY));
+            lastCrop.w = Math.round(Math.abs(endX - startX) * scaleX);
+            lastCrop.h = Math.round(Math.abs(endY - startY) * scaleY);
+            const standardCanvas = enhancePlate(preview, lastCrop.x, lastCrop.y, lastCrop.w, lastCrop.h, 'standard');
+            performOCR(standardCanvas, 1);
+        });
+
+        function enhancePlate(source, sx, sy, sw, sh, mode) {
+            const hidden = document.createElement('canvas');
+            const scale = 4;
+            hidden.width = sw * scale; hidden.height = sh * scale;
+            const hCtx = hidden.getContext('2d');
+            
+            hCtx.imageSmoothingEnabled = (mode === 'standard');
+            if(mode === 'standard') hCtx.imageSmoothingQuality = 'high';
+            
+            hCtx.drawImage(source, sx, sy, sw, sh, 0, 0, hidden.width, hidden.height);
+
+            const imgData = hCtx.getImageData(0, 0, hidden.width, hidden.height);
+            const data = imgData.data;
+
+            if (mode === 'standard') {
+                let contrast = 1.5; let intercept = 128 * (1 - contrast);
+                for(let i = 0; i < data.length; i += 4) {
+                    let g = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+                    g = g * contrast + intercept;
+                    g = g > 255 ? 255 : (g < 0 ? 0 : g);
+                    data[i] = data[i+1] = data[i+2] = g;
+                }
+            } else if (mode === 'aggressive') {
+                let totalLuminance = 0;
+                for(let i = 0; i < data.length; i += 4) {
+                    let g = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+                    data[i] = data[i+1] = data[i+2] = g;
+                    totalLuminance += g;
+                }
+                let avgLuminance = totalLuminance / (data.length / 4);
+                let threshold = avgLuminance * 0.85; 
+                for(let i = 0; i < data.length; i += 4) {
+                    let color = data[i] < threshold ? 0 : 255;
+                    data[i] = data[i+1] = data[i+2] = color;
+                }
+            }
+
+            hCtx.putImageData(imgData, 0, 0);
+            const final = document.createElement('canvas');
+            const trim = hidden.width * 0.12;
+            final.width = hidden.width - trim; final.height = hidden.height;
+            final.getContext('2d').drawImage(hidden, trim, 0, final.width, final.height, 0, 0, final.width, final.height);
+
+            processedPreview.style.display = 'block';
+            processedPreview.width = final.width; processedPreview.height = final.height;
+            processedPreview.getContext('2d').drawImage(final, 0, 0);
+            return final;
+        }
+
+        function fixPlateTypos(text) {
+            let clean = text.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+            if (clean.length < 5) return clean;
+            let result = "";
+            for (let i = 0; i < clean.length; i++) {
+                let char = clean[i];
+                if (i < 2 || i >= clean.length - 4) {
+                    if (char === 'O' || char === 'Q' || char === 'D') char = '0';
+                    if (char === 'I' || char === 'L') char = '1';
+                    if (char === 'Z') char = '2';
+                    if (char === 'S') char = '5';
+                    if (char === 'B') char = '8';
+                }
+                result += char;
+            }
+            return result;
+        }
+
+        // FOTOĞRAFI HAFIZAYA ALMAK İÇİN SIKIŞTIRMA İŞLEMİ (Yeni)
+        function getCompressedImage() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const MAX_WIDTH = 500; // Hafızayı doldurmamak için küçültüyoruz
+            let width = preview.naturalWidth;
+            let height = preview.naturalHeight;
+
+            if (width > MAX_WIDTH) {
+                height = Math.round((height * MAX_WIDTH) / width);
+                width = MAX_WIDTH;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(preview, 0, 0, width, height);
+            return canvas.toDataURL('image/jpeg', 0.6); // %60 Kalite JPEG (Hafif)
+        }
+
+        async function performOCR(canvas, attempt) {
+            resetUI();
+            statusDiv.innerHTML = attempt === 1 
+                ? "Tesseract okuyor... <br><small>Normal Mod</small>" 
+                : "Tesseract tekrar okuyor... <br><small>Gece/Gölge Modu Devrede</small>";
+            
+            try {
+                const worker = await Tesseract.createWorker('eng');
+                await worker.setParameters({
+                    tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+                    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK
+                });
+                const { data: { text } } = await worker.recognize(canvas);
+                await worker.terminate();
+                
+                let plate = fixPlateTypos(text).substring(0, 10);
+                
+                if (attempt === 1 && (plate.length < 5 || plate === "OKUNAMADI" || !/\d/.test(plate))) {
+                    statusDiv.innerHTML = "Normal okuma zayıf kaldı. <br><small>B Planı (Agresif Siyah/Beyaz) deneniyor...</small>";
+                    const aggressiveCanvas = enhancePlate(preview, lastCrop.x, lastCrop.y, lastCrop.w, lastCrop.h, 'aggressive');
+                    performOCR(aggressiveCanvas, 2); 
+                    return; 
+                }
+
+                if (!plate || plate.length < 4) plate = "OKUNAMADI";
+                statusDiv.innerText = "İşlem Tamamlandı! Bulunan: " + plate;
+                
+                // YENİ: Fotoğrafı ve Boş Not Alanını da Kaydet
+                const compressedImg = getCompressedImage();
+                saveRecord({ plate: plate, date: currentDateText, location: currentLocationText, image: compressedImg, note: "" });
+                
+                manualSelectBtn.style.display = 'block';
+                manualSelectBtn.innerText = "Hatalıysa Tekrar Seç";
+            } catch (e) {
+                statusDiv.innerText = "Okuma sırasında hata oluştu!";
+                manualSelectBtn.style.display = 'block';
+            }
+        }
+
+        function resetUI() {
+            manualSelectBtn.style.display = 'none';
+            confirmSelectionBtn.style.display = 'none';
+            selectionCanvas.style.display = 'none';
+            sCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+            isDrawing = false;
+        }
+
+        // YENİ KAYIT YÖNETİMİ FONKSİYONLARI
+        function saveRecord(r) {
+            let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
+            rs.unshift(r); 
+            // Telefon hafızası çökmesin diye en fazla son 30 aracı tutar
+            if(rs.length > 30) rs.pop();
+            localStorage.setItem('plate_records', JSON.stringify(rs));
+            loadRecords();
+        }
+
+        function updateNote(index, value) {
+            let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
+            if(rs[index]) {
+                rs[index].note = value;
+                localStorage.setItem('plate_records', JSON.stringify(rs));
+            }
+        }
+
+        function deleteRecord(index) {
+            if(confirm("Bu kaydı silmek istediğinize emin misiniz?")) {
+                let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
+                rs.splice(index, 1);
+                localStorage.setItem('plate_records', JSON.stringify(rs));
+                loadRecords();
+            }
+        }
+
+        function clearAllRecords() {
+            if(confirm("Tüm geçmiş kayıtlar kalıcı olarak silinecek. Emin misiniz?")) {
+                localStorage.removeItem('plate_records');
+                loadRecords();
+            }
+        }
+
+        // YENİ: PDF OLUŞTURMA VE İNDİRME MOTORU
+        function downloadPDF() {
+            let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
+            if (rs.length === 0) {
+                alert("Uyarı: İndirilecek kayıt bulunamadı!");
+                return;
+            }
+
+            // jsPDF Kütüphanesini Başlat
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Standart jsPDF fontu Türkçe karakterleri (ş,ğ,ı) desteklemediği için harfleri dönüştüren ufak bir filtre (Crash olmasını önler)
+            const trMap = { 'ç':'c', 'ğ':'g', 'ı':'i', 'ö':'o', 'ş':'s', 'ü':'u', 'Ç':'C', 'Ğ':'G', 'İ':'I', 'Ö':'O', 'Ş':'S', 'Ü':'U' };
+            const tr = (text) => text ? text.replace(/[çğıöşüÇĞİÖŞÜ]/g, m => trMap[m]) : "";
+
+            // Başlık
+            doc.setFontSize(18);
+            doc.text("Arac Kayit Raporu", 20, 20);
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text("Olusturulma: " + new Date().toLocaleString('tr-TR'), 20, 28);
+            doc.setTextColor(0);
+
+            let yPos = 40; // Sayfa başı dikey boşluk
+
+            rs.forEach((r, index) => {
+                // Eğer sayfanın sonuna geldiysek yeni sayfa aç
+                if (yPos > 260) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+
+                // 1. Araç Fotoğrafını Ekle (Genişlik: 40, Yükseklik: 30)
+                if (r.image) {
+                    try {
+                        doc.addImage(r.image, 'JPEG', 20, yPos, 40, 30);
+                    } catch(e) { console.log("Resim PDF'e eklenemedi."); }
+                }
+
+                // 2. Metin Bilgilerini Ekle
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text(`Plaka: ${tr(r.plate)}`, 65, yPos + 6);
+                
+                doc.setFontSize(11);
+                doc.setFont(undefined, 'normal');
+                doc.text(`Marka / Not: ${tr(r.note) || 'Belirtilmedi'}`, 65, yPos + 14);
+                doc.text(`Tarih: ${tr(r.date)}`, 65, yPos + 21);
+                doc.text(`Konum: ${tr(r.location)}`, 65, yPos + 28);
+
+                yPos += 40; // Bir sonraki araç için imleci aşağı kaydır
+                
+                // Araçlar arasına ayırıcı çizgi çek
+                doc.setDrawColor(200);
+                doc.line(20, yPos - 5, 190, yPos - 5);
+            });
+
+            // PDF'i Cihaza İndir
+            doc.save("ALPR_Rapor.pdf");
+        }
+
+        function copyRecord(index) {
+            let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
+            if(rs[index]) {
+                let r = rs[index];
+                let textToCopy = `🚗 Plaka: ${r.plate}\n📌 Marka/Not: ${r.note || 'Belirtilmedi'}\n📅 Tarih: ${r.date}\n📍 Koordinat: ${r.location}`;
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    alert("✅ Bilgiler panoya kopyalandı!\nGoogle Maps'e veya mesaja yapıştırabilirsiniz.");
+                }).catch(err => {
+                    alert("Kopyalama başarısız oldu, metni manuel seçebilirsiniz.");
+                });
+            }
+        }
+
+        // YENİ: KONUMU ZORLA GÜNCELLEME FONKSİYONU
+        function retryLocation(index) {
+            let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
+            if(rs[index]) {
+                // Kullanıcıya aradığımızı göster
+                rs[index].location = "Konum aranıyor... ⏳";
+                localStorage.setItem('plate_records', JSON.stringify(rs));
+                loadRecords(); // Ekranı hemen yenile ki kum saati görünsün
+
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        let rs2 = JSON.parse(localStorage.getItem('plate_records') || "[]");
+                        rs2[index].location = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+                        localStorage.setItem('plate_records', JSON.stringify(rs2));
+                        loadRecords(); // Başarıyla buldu, ekrana yaz
+                    },
+                    (err) => {
+                        alert("Hata: Konum erişim izni yok veya GPS uydusu bulunamıyor.");
+                        let rs2 = JSON.parse(localStorage.getItem('plate_records') || "[]");
+                        rs2[index].location = "Konum alınamadı";
+                        localStorage.setItem('plate_records', JSON.stringify(rs2));
+                        loadRecords(); // Bulamadı, eski haline döndür
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 } // Yüksek doğrulukla uyduları zorla
+                );
+            }
+        }
+
+        function loadRecords() {
+            let rs = JSON.parse(localStorage.getItem('plate_records') || "[]");
+            if (rs.length > 0) {
+                clearAllBtn.style.display = "block";
+                recordsList.innerHTML = rs.map((r, i) => `
+                    <div class="record-item">
+                        <img src="${r.image}" class="record-image" alt="Araç Resmi">
+                        <h3>🚗 ${r.plate}</h3>
+                        
+                        <p class="copyable-text" onclick="retryLocation(${i})" style="cursor:pointer; padding: 5px; background: rgba(255,255,255,0.05); border-radius: 5px; transition: 0.2s;">
+                            📍 Koordinat: <strong style="${r.location === 'Konum alınamadı' ? 'color:#ff453a;' : (r.location.includes('⏳') ? 'color:#ffd60a;' : 'color:#32d74b;')}">
+                            ${r.location} ${r.location === 'Konum alınamadı' ? '🔄 (Tıkla Yenile)' : ''}
+                            </strong>
+                        </p>
+                        
+                        <p class="copyable-text">📅 Tarih: ${r.date}</p>
+                        <input type="text" class="note-input" placeholder="Marka, Model veya Not yazın..." value="${r.note}" onchange="updateNote(${i}, this.value)">
+                        <div class="record-actions">
+                            <button class="action-btn copy-btn" onclick="copyRecord(${i})">📋 Kopyala</button>
+                            <button class="action-btn delete-btn" onclick="deleteRecord(${i})">🗑 Sil</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                clearAllBtn.style.display = "none";
+                recordsList.innerHTML = "<p style='text-align:center; color:#8e8e93;'>Henüz kayıtlı araç yok.</p>";
+            }
+        }
+
+    </script>
+</body>
+</html>
